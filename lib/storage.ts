@@ -1,126 +1,185 @@
-import { createEmptyResume, normalizeResumeData } from "@/lib/empty-resume";
-import { createId } from "@/lib/id";
+import { normalizeResumeData } from "@/lib/empty-resume";
 import type { ResumeData, StoredResume } from "@/lib/types";
 
-const STORAGE_KEY = "ai-resume-builder:v1";
-
-// Persistence is local until auth is added. StoredResume.ownerId is reserved
-// so private per-account resumes can be attached without rewriting the builder.
-
-type StoreShape = {
-  resumes: StoredResume[];
+type ApiResume = {
+  _id: string;
+  name: string;
+  ownerId: string | null;
+  data: ResumeData;
+  createdAt: string;
+  updatedAt: string;
 };
 
-function canUseStorage() {
-  return typeof window !== "undefined" && "localStorage" in window;
-}
-
-function hydrate(record: StoredResume): StoredResume {
-  return { ...record, data: normalizeResumeData(record.data) };
-}
-
-function readStore(): StoreShape {
-  if (!canUseStorage()) return { resumes: [] };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { resumes: [] };
-    const parsed = JSON.parse(raw) as StoreShape;
-    return { resumes: Array.isArray(parsed.resumes) ? parsed.resumes.map(hydrate) : [] };
-  } catch {
-    return { resumes: [] };
-  }
-}
-
-const listeners = new Set<() => void>();
-
-function emit() {
-  listeners.forEach((listener) => listener());
-}
-
-export function subscribeStore(listener: () => void) {
-  listeners.add(listener);
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", listener);
-  }
-  return () => {
-    listeners.delete(listener);
-    if (typeof window !== "undefined") {
-      window.removeEventListener("storage", listener);
-    }
+function hydrate(record: ApiResume): StoredResume {
+  return {
+    id: record._id,
+    name: record.name,
+    ownerId: record.ownerId ?? null,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    data: normalizeResumeData(record.data),
   };
 }
 
-function writeStore(store: StoreShape) {
-  if (!canUseStorage()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  emit();
+export async function listResumes(): Promise<StoredResume[]> {
+  const response = await fetch("/api/resumes", {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load resumes");
+  }
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.message || "Failed to load resumes");
+  }
+
+  return (result.resumes as ApiResume[])
+    .map(hydrate)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export function listResumes(): StoredResume[] {
-  return readStore().resumes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+export async function getResume(
+  id: string
+): Promise<StoredResume | null> {
+  const response = await fetch(`/api/resumes/${id}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to load resume");
+  }
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.message || "Failed to load resume");
+  }
+
+  return hydrate(result.resume as ApiResume);
 }
 
-export function getResume(id: string): StoredResume | null {
-  return readStore().resumes.find((item) => item.id === id) ?? null;
-}
-
-export function createResume(options?: {
+export async function createResume(options?: {
   name?: string;
   data?: ResumeData;
-}): StoredResume {
-  const now = new Date().toISOString();
-  const record: StoredResume = {
-    id: createId(),
-    name: options?.name?.trim() || "Untitled resume",
-    ownerId: null,
-    createdAt: now,
-    updatedAt: now,
-    data: options?.data ?? createEmptyResume(),
-  };
-  const store = readStore();
-  store.resumes.unshift(record);
-  writeStore(store);
-  return record;
+}): Promise<StoredResume> {
+  const response = await fetch("/api/resumes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: options?.name?.trim() || "Untitled resume",
+      ownerId: null,
+      data: options?.data,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create resume");
+  }
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.message || "Failed to create resume");
+  }
+
+  return hydrate(result.resume as ApiResume);
 }
 
-export function saveResume(id: string, data: ResumeData, name?: string) {
-  const store = readStore();
-  const index = store.resumes.findIndex((item) => item.id === id);
-  if (index === -1) return null;
-  store.resumes[index] = {
-    ...store.resumes[index],
-    data,
-    name: name?.trim() || store.resumes[index].name,
-    updatedAt: new Date().toISOString(),
-  };
-  writeStore(store);
-  return store.resumes[index];
+export async function saveResume(
+  id: string,
+  data: ResumeData,
+  name?: string
+): Promise<StoredResume | null> {
+  const response = await fetch(`/api/resumes/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name,
+      ownerId: null,
+      data,
+    }),
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to save resume");
+  }
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.message || "Failed to save resume");
+  }
+
+  return hydrate(result.resume as ApiResume);
 }
 
-export function renameResume(id: string, name: string) {
-  const store = readStore();
-  const index = store.resumes.findIndex((item) => item.id === id);
-  if (index === -1) return null;
-  store.resumes[index] = {
-    ...store.resumes[index],
-    name: name.trim() || store.resumes[index].name,
-    updatedAt: new Date().toISOString(),
-  };
-  writeStore(store);
-  return store.resumes[index];
+export async function renameResume(
+  id: string,
+  name: string
+): Promise<StoredResume | null> {
+  const existing = await getResume(id);
+
+  if (!existing) {
+    return null;
+  }
+
+  return saveResume(id, existing.data, name);
 }
 
-export function duplicateResume(id: string) {
-  const original = getResume(id);
-  if (!original) return null;
+export async function duplicateResume(
+  id: string
+): Promise<StoredResume | null> {
+  const original = await getResume(id);
+
+  if (!original) {
+    return null;
+  }
+
   return createResume({
     name: `${original.name} copy`,
     data: structuredClone(original.data),
   });
 }
 
-export function deleteResume(id: string) {
-  const store = readStore();
-  store.resumes = store.resumes.filter((item) => item.id !== id);
-  writeStore(store);
+export async function deleteResume(id: string): Promise<boolean> {
+  const response = await fetch(`/api/resumes/${id}`, {
+    method: "DELETE",
+  });
+
+  if (response.status === 404) {
+    return false;
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to delete resume");
+  }
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.message || "Failed to delete resume");
+  }
+
+  return true;
+}
+
+export function subscribeStore(_listener: () => void) {
+  return () => {};
 }

@@ -20,9 +20,9 @@ export function ModernTemplate({ data }: { data: ResumeData }) {
       <aside className="w-[32%] px-5 py-8 text-white" style={{ background: "var(--resume-accent)" }}>
         {showPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={data.personal.photo} alt="" className="mb-4 h-20 w-20 object-cover" />
+          <img src={data.personal.photo} alt="" className="mb-4 h-36 w-36 object-contain" />
         ) : null}
-        <h1 className="text-2xl font-semibold">{data.personal.fullName || "Your Name"}</h1>
+        <h1 className="text-xl font-semibold">{data.personal.fullName || "Your Name"}</h1>
         {hasText(data.personal.title) ? (
           <p className="mt-2 text-sm text-white/80">{data.personal.title}</p>
         ) : null}
@@ -67,7 +67,7 @@ export function ModernTemplate({ data }: { data: ResumeData }) {
             <h3 className={`${headingClass(data.customization.headingStyle)} mb-2`} style={{ color: "var(--resume-accent)" }}>
               Profile
             </h3>
-            <p>{data.summary}</p>
+            <p className="text-sm">{data.summary}</p>
           </section>
         ) : null}
         {view.experience.length ? (

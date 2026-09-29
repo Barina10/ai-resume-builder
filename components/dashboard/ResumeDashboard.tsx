@@ -36,17 +36,63 @@ export function ResumeDashboard() {
     [items],
   );
 
-  useEffect(() => {
-    setItems(listResumes());
-  }, []);
-
-  function refresh() {
-    setItems(listResumes());
+  async function refresh() {
+    try {
+      const resumes = await listResumes();
+      setItems(resumes);
+    } catch (error) {
+      console.error("Failed to load resumes:", error);
+    }
   }
 
-  function createNew() {
-    const record = createResume();
-    router.push(`/builder?id=${record.id}`);
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function createNew() {
+    try {
+      const record = await createResume();
+      router.push(`/builder?id=${record.id}`);
+    } catch (error) {
+      console.error("Failed to create resume:", error);
+      window.alert("Could not create resume. Please try again.");
+    }
+  }
+
+  async function handleDuplicate(id: string) {
+    try {
+      await duplicateResume(id);
+      await refresh();
+    } catch (error) {
+      console.error("Failed to duplicate resume:", error);
+      window.alert("Could not duplicate resume. Please try again.");
+    }
+  }
+
+  async function handleRename() {
+    if (!renameId) return;
+
+    try {
+      await renameResume(renameId, renameValue);
+      setRenameId(null);
+      await refresh();
+    } catch (error) {
+      console.error("Failed to rename resume:", error);
+      window.alert("Could not rename resume. Please try again.");
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return;
+
+    try {
+      await deleteResume(deleteId);
+      setDeleteId(null);
+      await refresh();
+    } catch (error) {
+      console.error("Failed to delete resume:", error);
+      window.alert("Could not delete resume. Please try again.");
+    }
   }
 
   return (
@@ -56,18 +102,26 @@ export function ResumeDashboard() {
           <Link href="/" className="text-sm font-medium text-slate-500">
             AI Resume Builder
           </Link>
+
           <Button onClick={createNew}>Create new resume</Button>
         </div>
       </header>
+
       <main className="mx-auto max-w-6xl px-6 py-10">
         <h1 className="text-3xl font-semibold tracking-tight">My Resumes</h1>
+
         <p className="mt-2 text-slate-600">
-          Resumes are saved in this browser until you add an account.
+          Your resumes are saved securely in your MongoDB database.
         </p>
+
         {sorted.length === 0 ? (
           <div className="mt-10 border border-dashed border-slate-300 bg-white p-8">
             <p className="font-medium">No resumes yet</p>
-            <p className="mt-1 text-sm text-slate-600">Create one to start building.</p>
+
+            <p className="mt-1 text-sm text-slate-600">
+              Create one to start building.
+            </p>
+
             <Button className="mt-4" onClick={createNew}>
               Create my resume
             </Button>
@@ -75,28 +129,43 @@ export function ResumeDashboard() {
         ) : (
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {sorted.map((resume) => (
-              <article key={resume.id} className="border border-slate-200 bg-white p-5">
+              <article
+                key={resume.id}
+                className="border border-slate-200 bg-white p-5"
+              >
                 <h2 className="text-lg font-semibold">{resume.name}</h2>
+
                 <p className="mt-1 text-sm text-slate-600">
                   Target job: {resume.data.targetJob.title || "Not set"}
                 </p>
+
                 <p className="text-sm text-slate-600">
                   Template:{" "}
-                  {TEMPLATES.find((item) => item.id === resume.data.template)?.label ||
-                    resume.data.template}
+                  {TEMPLATES.find(
+                    (item) => item.id === resume.data.template,
+                  )?.label || resume.data.template}
                 </p>
-                <p className="text-sm text-slate-500">Updated {formatDate(resume.updatedAt)}</p>
+
+                <p className="text-sm text-slate-500">
+                  Updated {formatDate(resume.updatedAt)}
+                </p>
+
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button onClick={() => router.push(`/builder?id=${resume.id}`)}>Edit</Button>
+                  <Button
+                    onClick={() =>
+                      router.push(`/builder?id=${resume.id}`)
+                    }
+                  >
+                    Edit
+                  </Button>
+
                   <Button
                     variant="secondary"
-                    onClick={() => {
-                      duplicateResume(resume.id);
-                      refresh();
-                    }}
+                    onClick={() => handleDuplicate(resume.id)}
                   >
                     Duplicate
                   </Button>
+
                   <Button
                     variant="secondary"
                     onClick={() => {
@@ -106,13 +175,20 @@ export function ResumeDashboard() {
                   >
                     Rename
                   </Button>
+
                   <Button
                     variant="secondary"
-                    onClick={() => router.push(`/builder?id=${resume.id}`)}
+                    onClick={() =>
+                      router.push(`/builder?id=${resume.id}`)
+                    }
                   >
                     Download
                   </Button>
-                  <Button variant="danger" onClick={() => setDeleteId(resume.id)}>
+
+                  <Button
+                    variant="danger"
+                    onClick={() => setDeleteId(resume.id)}
+                  >
                     Delete
                   </Button>
                 </div>
@@ -121,40 +197,50 @@ export function ResumeDashboard() {
           </div>
         )}
       </main>
+
       <Modal
         open={Boolean(renameId)}
         title="Rename resume"
         onClose={() => setRenameId(null)}
       >
-        <Input label="Name" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} />
+        <Input
+          label="Name"
+          value={renameValue}
+          onChange={(event) => setRenameValue(event.target.value)}
+        />
+
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setRenameId(null)}>
+          <Button
+            variant="ghost"
+            onClick={() => setRenameId(null)}
+          >
             Cancel
           </Button>
-          <Button
-            onClick={() => {
-              if (renameId) renameResume(renameId, renameValue);
-              setRenameId(null);
-              refresh();
-            }}
-          >
-            Save
-          </Button>
+
+          <Button onClick={handleRename}>Save</Button>
         </div>
       </Modal>
-      <Modal open={Boolean(deleteId)} title="Delete resume?" onClose={() => setDeleteId(null)}>
-        <p className="text-sm text-slate-600">This cannot be undone on this device.</p>
+
+      <Modal
+        open={Boolean(deleteId)}
+        title="Delete resume?"
+        onClose={() => setDeleteId(null)}
+      >
+        <p className="text-sm text-slate-600">
+          This will permanently delete the resume from MongoDB.
+        </p>
+
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setDeleteId(null)}>
+          <Button
+            variant="ghost"
+            onClick={() => setDeleteId(null)}
+          >
             Cancel
           </Button>
+
           <Button
             variant="danger"
-            onClick={() => {
-              if (deleteId) deleteResume(deleteId);
-              setDeleteId(null);
-              refresh();
-            }}
+            onClick={handleDelete}
           >
             Delete
           </Button>
