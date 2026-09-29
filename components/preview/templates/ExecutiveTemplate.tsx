@@ -13,7 +13,7 @@ export function ExecutiveTemplate({ data }: { data: ResumeData }) {
   const view = visibleResume(data);
   const showPhoto = hasText(data.personal.photo);
   return (
-    <article className="resume-paper min-h-[1056px] bg-white leading-relaxed text-slate-800" style={paperStyle(data)}>
+    <article className="resume-paper min-h-0 bg-white leading-relaxed text-slate-800" style={paperStyle(data)}>
       <header className="mb-6 flex items-start justify-between gap-6 border-b-2 pb-4" style={{ borderColor: "var(--resume-accent)" }}>
         <div>
           <h1 className="text-3xl font-semibold">{data.personal.fullName || "Your Name"}</h1>
@@ -45,7 +45,7 @@ export function ExecutiveTemplate({ data }: { data: ResumeData }) {
           <ExperienceBlock data={data} />
         </section>
       ) : null}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-6 print:grid-cols-1">
         {view.education.length ? (
           <section>
             <h3 className={`${headingClass(data.customization.headingStyle)} mb-2`} style={{ color: "var(--resume-accent)" }}>

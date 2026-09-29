@@ -13,7 +13,7 @@ export function ModernTemplate({ data }: { data: ResumeData }) {
   const view = visibleResume(data);
   const showPhoto = hasText(data.personal.photo);
   return (
-    <article className="resume-paper flex min-h-[1056px] bg-white leading-relaxed text-slate-800" style={paperStyle({
+    <article className="resume-paper flex min-h-0 bg-white leading-snug text-slate-800" style={paperStyle({
       ...data,
       customization: { ...data.customization, margins: "narrow" },
     })}>

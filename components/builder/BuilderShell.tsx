@@ -26,7 +26,7 @@ export function BuilderShell() {
   const [data, setData] = useState<ResumeData>(createEmptyResume);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
-  const createdRef = useRef(false);
+ const createdRef = useRef<ReturnType<typeof createResume> | null>(null);
   const [ready, setReady] = useState(false);
   const errors = useMemo(() => validateResume(data), [data]);
 
@@ -49,11 +49,12 @@ export function BuilderShell() {
           }
         }
 
-        if (createdRef.current) return;
+        
 
-        createdRef.current = true;
+        const createPromise =
+  createdRef.current ?? (createdRef.current = createResume());
 
-        const record = await createResume();
+        const record = await (createdRef.current ?? (createdRef.current = createResume()));
 
         if (cancelled) return;
 
@@ -199,8 +200,8 @@ export function BuilderShell() {
 
         <div
           className={`${
-            mobileTab === "edit" ? "hidden lg:block" : ""
-          } lg:sticky lg:top-28`}
+  mobileTab === "edit" ? "hidden lg:block print:block" : ""
+} lg:sticky lg:top-28`}
         >
           <p className="print-hidden mb-3 text-sm font-medium text-slate-500">
             Live preview

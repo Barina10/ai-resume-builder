@@ -54,8 +54,8 @@ body {
   }
 
   .resume-section,
-  .resume-block {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+.resume-block {
+  break-inside: auto;
+  page-break-inside: auto;
+}
 }
